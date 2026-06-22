@@ -55,6 +55,22 @@ export default function Index() {
   const [events, setEvents] = useState<AppEvent[]>([]);
   const [online, setOnline] = useState<boolean | null>(null);
 
+  const [checkingPing, setCheckingPing] = useState(false);
+
+  const handlePing = async () => {
+    setCheckingPing(true);
+    try {
+      await fetch(API_URL + '/');
+      setOnline(true);
+      toast.success('Сервер доступен');
+    } catch {
+      setOnline(false);
+      toast.error('Сервер недоступен');
+    } finally {
+      setCheckingPing(false);
+    }
+  };
+
   const [camName, setCamName] = useState('');
   const [camUrl, setCamUrl] = useState('');
   const [loadingCam, setLoadingCam] = useState(false);
@@ -182,6 +198,16 @@ export default function Index() {
               {online ? 'SERVER ONLINE' : online === false ? 'OFFLINE' : 'CONNECTING…'}
             </span>
             <span className="ml-3 hidden text-muted-foreground/60 md:inline">{API_URL}</span>
+            <button
+              onClick={handlePing}
+              disabled={checkingPing}
+              className="ml-2 flex items-center gap-1.5 rounded border border-neon-cyan/30 px-2.5 py-1 text-[11px] uppercase tracking-wider text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-50 transition-colors"
+            >
+              {checkingPing
+                ? <Icon name="LoaderCircle" size={12} className="animate-spin" />
+                : <Icon name="Radio" size={12} />}
+              Пинг
+            </button>
           </div>
         </div>
       </header>
