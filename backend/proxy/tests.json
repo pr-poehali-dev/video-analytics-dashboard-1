@@ -5,6 +5,18 @@
       "method": "GET",
       "path": "/?path=/",
       "expectedStatus": 200
+    },
+    {
+      "name": "List known_people",
+      "method": "GET",
+      "path": "/?path=/known_people",
+      "expectedStatus": 200
+    },
+    {
+      "name": "List faces",
+      "method": "GET",
+      "path": "/?path=/faces",
+      "expectedStatus": 200
     }
   ]
 }
