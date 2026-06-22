@@ -20,17 +20,19 @@ export default {
 		},
 		extend: {
 			fontFamily: {
-				display: ['Orbitron', 'sans-serif'],
+				display: ['Rubik', 'sans-serif'],
 				body: ['Rubik', 'sans-serif'],
 				mono: ['JetBrains Mono', 'monospace']
 			},
 			colors: {
-				neon: {
-					cyan: 'hsl(var(--neon-cyan))',
-					lime: 'hsl(var(--neon-lime))',
-					red: 'hsl(var(--neon-red))',
-					blue: 'hsl(var(--neon-blue))'
+				brand: {
+					DEFAULT: 'hsl(231 80% 55%)',
+					light: 'hsl(220 100% 95%)',
+					mid:   'hsl(225 70% 65%)',
+					dark:  'hsl(231 80% 42%)',
 				},
+				success: 'hsl(152 60% 45%)',
+				warning: 'hsl(28 95% 60%)',
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',

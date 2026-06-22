@@ -17,124 +17,94 @@ import { camerasApi, Camera } from '@/api/cameras';
 import { eventsApi, AppEvent } from '@/api/events';
 import { facesApi } from '@/api/faces';
 
-const eventStyle = (type: string) => {
+/* ── helpers ── */
+const eventMeta = (type: string) => {
   const t = (type || '').toLowerCase();
   if (t.includes('наруш') || t.includes('violat') || t.includes('alert'))
-    return { color: 'text-neon-red', label: 'Нарушение', icon: 'TriangleAlert' };
+    return { color: 'text-red-500', bg: 'bg-red-50', dot: 'bg-red-400', label: 'Нарушение', icon: 'TriangleAlert' };
   if (t.includes('вход') || t.includes('enter') || t.includes('in'))
-    return { color: 'text-neon-lime', label: 'Вход', icon: 'LogIn' };
+    return { color: 'text-green-600', bg: 'bg-green-50', dot: 'bg-green-400', label: 'Вход', icon: 'LogIn' };
   if (t.includes('выход') || t.includes('exit') || t.includes('out'))
-    return { color: 'text-neon-blue', label: 'Выход', icon: 'LogOut' };
-  return { color: 'text-neon-cyan', label: type || '—', icon: 'Activity' };
+    return { color: 'text-orange-500', bg: 'bg-orange-50', dot: 'bg-orange-400', label: 'Выход', icon: 'LogOut' };
+  return { color: 'text-brand', bg: 'bg-brand-light', dot: 'bg-brand', label: type || '—', icon: 'Activity' };
 };
 
-const Panel = ({
-  title,
-  icon,
-  children,
-  action,
-}: {
-  title: string;
-  icon: string;
-  children: React.ReactNode;
-  action?: React.ReactNode;
-}) => (
-  <section className="glass clip-corner neon-border relative overflow-hidden">
-    <div className="flex items-center justify-between border-b border-border px-5 py-3">
-      <h2 className="flex items-center gap-2 text-sm font-display uppercase tracking-widest text-neon-cyan">
-        <Icon name={icon} size={16} /> {title}
-      </h2>
-      {action}
+/* ── Card ── */
+const Card = ({ children, className = '', style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) => (
+  <div className={`bg-white rounded-2xl card-shadow p-6 ${className}`} style={style}>{children}</div>
+);
+
+/* ── Section header ── */
+const SectionHead = ({ icon, title, action }: { icon: string; title: string; action?: React.ReactNode }) => (
+  <div className="flex items-center justify-between mb-5">
+    <div className="flex items-center gap-2">
+      <div className="w-8 h-8 blue-gradient rounded-xl flex items-center justify-center">
+        <Icon name={icon} size={16} className="text-white" />
+      </div>
+      <h2 className="text-base font-bold text-foreground">{title}</h2>
     </div>
-    <div className="p-5">{children}</div>
-  </section>
+    {action}
+  </div>
 );
 
 export default function Index() {
-  const [cameras, setCameras] = useState<Camera[]>([]);
-  const [events, setEvents] = useState<AppEvent[]>([]);
-  const [online, setOnline] = useState<boolean | null>(null);
-
+  const [cameras, setCameras]   = useState<Camera[]>([]);
+  const [events, setEvents]     = useState<AppEvent[]>([]);
+  const [faces, setFaces]       = useState<string[]>([]);
+  const [online, setOnline]     = useState<boolean | null>(null);
   const [checkingPing, setCheckingPing] = useState(false);
 
-  const handlePing = async () => {
-    setCheckingPing(true);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
-    try {
-      await fetch(api.pingUrl(), { signal: controller.signal });
-      setOnline(true);
-      toast.success('Сервер доступен');
-    } catch {
-      setOnline(false);
-      toast.error('Сервер недоступен — проверьте, что FastAPI запущен на 72.56.35.26:8000');
-    } finally {
-      clearTimeout(timer);
-      setCheckingPing(false);
-    }
-  };
-
-  const [camName, setCamName] = useState('');
-  const [camUrl, setCamUrl] = useState('');
-  const [loadingCam, setLoadingCam] = useState(false);
-  const [loadingFace, setLoadingFace] = useState(false);
-  const [loadingVideo, setLoadingVideo] = useState(false);
-  const [camOpen, setCamOpen] = useState(false);
+  const [camName, setCamName]   = useState('');
+  const [camUrl, setCamUrl]     = useState('');
+  const [camOpen, setCamOpen]   = useState(false);
   const [faceOpen, setFaceOpen] = useState(false);
   const [faceFile, setFaceFile] = useState<File | null>(null);
-  const [faces, setFaces] = useState<string[]>([]);
 
+  const [loadingCam, setLoadingCam]   = useState(false);
+  const [loadingFace, setLoadingFace] = useState(false);
+  const [loadingVideo, setLoadingVideo] = useState(false);
+
+  /* ── loaders ── */
   const loadCameras = useCallback(async () => {
-    try {
-      const data = await camerasApi.list();
-      setCameras(Array.isArray(data) ? data : []);
-      setOnline(true);
-    } catch {
-      setOnline(false);
-    }
+    try { setCameras(Array.isArray(await camerasApi.list() ) ? await camerasApi.list() : []); setOnline(true); }
+    catch { setOnline(false); }
   }, []);
 
   const loadEvents = useCallback(async () => {
-    try {
-      const data = await eventsApi.list();
-      setEvents(Array.isArray(data) ? data : []);
-    } catch {
-      /* silent */
-    }
+    try { const d = await eventsApi.list(); setEvents(Array.isArray(d) ? d : []); } catch { /* silent */ }
   }, []);
 
   const loadFaces = useCallback(async () => {
-    try {
-      const data = await facesApi.list();
-      if (data.length) setFaces(data);
-    } catch {
-      /* silent */
-    }
+    try { const d = await facesApi.list(); if (d.length) setFaces(d); } catch { /* silent */ }
   }, []);
 
   useEffect(() => {
-    loadCameras();
-    loadEvents();
-    loadFaces();
+    loadCameras(); loadEvents(); loadFaces();
     const id = setInterval(loadEvents, 5000);
     return () => clearInterval(id);
   }, [loadCameras, loadEvents, loadFaces]);
+
+  /* ── actions ── */
+  const handlePing = async () => {
+    setCheckingPing(true);
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    try {
+      await fetch(api.pingUrl(), { signal: ctrl.signal });
+      setOnline(true); toast.success('Сервер доступен');
+    } catch {
+      setOnline(false); toast.error('Сервер недоступен');
+    } finally { clearTimeout(t); setCheckingPing(false); }
+  };
 
   const handleAddCamera = async () => {
     if (!camName || !camUrl) return toast.error('Заполните название и RTSP URL');
     setLoadingCam(true);
     try {
       await camerasApi.add(camName, camUrl);
-      toast.success('Камера добавлена');
-      setCamName('');
-      setCamUrl('');
-      setCamOpen(false);
-      loadCameras();
-    } catch {
-      toast.error('Не удалось добавить камеру');
-    } finally {
-      setLoadingCam(false);
-    }
+      toast.success('Камера добавлена'); setCamName(''); setCamUrl(''); setCamOpen(false); loadCameras();
+    } catch { toast.error('Не удалось добавить камеру'); }
+    finally { setLoadingCam(false); }
   };
 
   const handleUploadFace = async () => {
@@ -142,265 +112,282 @@ export default function Index() {
     setLoadingFace(true);
     try {
       await facesApi.upload(faceFile);
-      toast.success('Фото сотрудника загружено');
-      setFaces((p) => [faceFile.name, ...p]);
-      setFaceFile(null);
-      setFaceOpen(false);
-    } catch {
-      toast.error('Ошибка загрузки фото');
-    } finally {
-      setLoadingFace(false);
-    }
+      toast.success('Фото загружено');
+      setFaces(p => [faceFile.name, ...p]); setFaceFile(null); setFaceOpen(false);
+    } catch { toast.error('Ошибка загрузки'); }
+    finally { setLoadingFace(false); }
   };
 
   const handleUploadVideo = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const file = e.target.files?.[0]; if (!file) return;
     setLoadingVideo(true);
-    try {
-      await camerasApi.uploadVideo(file);
-      toast.success('Видео загружено');
-    } catch {
-      toast.error('Ошибка загрузки видео');
-    } finally {
-      setLoadingVideo(false);
-      e.target.value = '';
-    }
+    try { await camerasApi.uploadVideo(file); toast.success('Видео загружено'); }
+    catch { toast.error('Ошибка загрузки видео'); }
+    finally { setLoadingVideo(false); e.target.value = ''; }
   };
 
-  const stats = [
-    { label: 'Камеры', value: cameras.length, icon: 'Cctv', color: 'text-neon-cyan' },
-    { label: 'События', value: events.length, icon: 'Zap', color: 'text-neon-lime' },
-    { label: 'Сотрудники', value: faces.length, icon: 'Users', color: 'text-neon-blue' },
+  const statCards = [
+    { label: 'Камеры',      value: cameras.length, icon: 'Cctv',  gradient: 'from-blue-500 to-blue-400' },
+    { label: 'События',     value: events.length,  icon: 'Zap',   gradient: 'from-violet-500 to-violet-400' },
+    { label: 'Сотрудники',  value: faces.length,   icon: 'Users', gradient: 'from-sky-400 to-cyan-400' },
   ];
 
   return (
-    <div className="min-h-screen scanline">
-      <header className="border-b border-border glass sticky top-0 z-20">
-        <div className="container flex items-center justify-between py-4">
+    <div className="min-h-screen bg-background">
+      {/* ── HEADER ── */}
+      <header className="bg-white border-b border-border sticky top-0 z-20 card-shadow">
+        <div className="container flex items-center justify-between py-3.5">
+          {/* logo */}
           <div className="flex items-center gap-3">
-            <div className="relative flex h-10 w-10 items-center justify-center clip-corner bg-neon-cyan/10 neon-border">
-              <Icon name="ScanEye" size={22} className="text-neon-cyan" />
+            <div className="w-10 h-10 blue-gradient rounded-2xl flex items-center justify-center shadow-md">
+              <Icon name="ScanEye" size={20} className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-display font-black neon-text text-neon-cyan leading-none">
-                NEUROVISION
-              </h1>
-              <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-muted-foreground">
-                Control Center
-              </span>
+              <p className="text-[11px] text-muted-foreground font-medium leading-none mb-0.5 uppercase tracking-wider">Видеоаналитика</p>
+              <h1 className="text-lg font-bold leading-none text-foreground">Панель управления</h1>
             </div>
           </div>
-          <div className="flex items-center gap-2 font-mono text-xs">
-            <span
-              className={`h-2 w-2 rounded-full live-dot ${
-                online ? 'bg-neon-lime' : online === false ? 'bg-neon-red' : 'bg-muted-foreground'
-              }`}
-            />
-            <span className="text-muted-foreground">
-              {online ? 'SERVER ONLINE' : online === false ? 'OFFLINE' : 'CONNECTING…'}
-            </span>
-            <span className="ml-3 hidden text-muted-foreground/60 md:inline">72.56.35.26:8000</span>
-            <button
+
+          {/* status + ping */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-secondary rounded-full px-3 py-1.5">
+              <span className={`w-2 h-2 rounded-full live-ring ${online ? 'bg-success' : online === false ? 'bg-destructive' : 'bg-muted-foreground'}`} />
+              <span className="text-xs font-medium text-muted-foreground">
+                {online ? 'Онлайн' : online === false ? 'Офлайн' : 'Подключение…'}
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handlePing}
               disabled={checkingPing}
-              className="ml-2 flex items-center gap-1.5 rounded border border-neon-cyan/30 px-2.5 py-1 text-[11px] uppercase tracking-wider text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-50 transition-colors"
+              className="rounded-xl gap-1.5 border-border"
             >
               {checkingPing
-                ? <Icon name="LoaderCircle" size={12} className="animate-spin" />
-                : <Icon name="Radio" size={12} />}
+                ? <Icon name="LoaderCircle" size={14} className="animate-spin" />
+                : <Icon name="Radio" size={14} />}
               Пинг
-            </button>
+            </Button>
           </div>
         </div>
       </header>
 
-      <main className="container space-y-6 py-8">
+      <main className="container py-8 space-y-6">
+
+        {/* ── STATS ── */}
         <div className="grid gap-4 sm:grid-cols-3">
-          {stats.map((s, i) => (
-            <div
+          {statCards.map((s, i) => (
+            <Card
               key={s.label}
-              className="glass clip-corner neon-border animate-sweep relative overflow-hidden p-5 animate-fade-up"
+              className="animate-fade-up flex items-center gap-5"
               style={{ animationDelay: `${i * 80}ms` }}
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className={`font-display text-4xl font-black ${s.color}`}>
-                    {String(s.value).padStart(2, '0')}
-                  </div>
-                  <div className="mt-1 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-                    {s.label}
-                  </div>
-                </div>
-                <Icon name={s.icon} size={40} className={`${s.color} opacity-30`} />
+              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${s.gradient} flex items-center justify-center shadow-md flex-shrink-0`}>
+                <Icon name={s.icon} size={26} className="text-white" />
               </div>
-            </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground leading-none">{s.value}</p>
+                <p className="text-sm text-muted-foreground mt-1">{s.label}</p>
+              </div>
+            </Card>
           ))}
         </div>
 
+        {/* ── EMPLOYEES + CAMERAS ── */}
         <div className="grid gap-6 lg:grid-cols-2">
-          <Panel
-            title="Сотрудники"
-            icon="UserRound"
-            action={
-              <Dialog open={faceOpen} onOpenChange={setFaceOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" variant="outline" className="gap-1 border-neon-cyan/40 text-neon-cyan hover:bg-neon-cyan/10">
-                    <Icon name="Upload" size={14} /> Фото
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="glass border-neon-cyan/30">
-                  <DialogHeader>
-                    <DialogTitle className="font-display text-neon-cyan">Загрузить фото сотрудника</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-3 py-2">
-                    <Label className="font-mono text-xs">Изображение лица</Label>
-                    <Input type="file" accept="image/*" onChange={(e) => setFaceFile(e.target.files?.[0] || null)} />
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleUploadFace} disabled={loadingFace} className="bg-neon-cyan text-background hover:bg-neon-cyan/80">
-                      {loadingFace ? <Icon name="LoaderCircle" size={16} className="animate-spin" /> : 'Загрузить'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            }
-          >
-            {faces.length === 0 ? (
-              <p className="py-6 text-center font-mono text-xs text-muted-foreground">
-                Нет загруженных в этой сессии. Загрузите фото в /known_people.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {faces.map((f, i) => (
-                  <li key={i} className="flex items-center gap-3 rounded border border-border bg-secondary/40 px-3 py-2 font-mono text-sm animate-fade-up">
-                    <Icon name="UserCheck" size={16} className="text-neon-lime" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
 
-          <Panel
-            title="Камеры и видео"
-            icon="Cctv"
-            action={
-              <div className="flex gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-neon-lime/40 px-3 py-1.5 text-xs font-medium text-neon-lime hover:bg-neon-lime/10">
-                  {loadingVideo ? (
-                    <Icon name="LoaderCircle" size={14} className="animate-spin" />
-                  ) : (
-                    <Icon name="Film" size={14} />
-                  )}
-                  Видео
-                  <input type="file" accept="video/*" className="hidden" onChange={handleUploadVideo} />
-                </label>
-                <Dialog open={camOpen} onOpenChange={setCamOpen}>
+          {/* Сотрудники */}
+          <Card>
+            <SectionHead
+              icon="UserRound"
+              title="Сотрудники"
+              action={
+                <Dialog open={faceOpen} onOpenChange={setFaceOpen}>
                   <DialogTrigger asChild>
-                    <Button size="sm" variant="outline" className="gap-1 border-neon-cyan/40 text-neon-cyan hover:bg-neon-cyan/10">
-                      <Icon name="Plus" size={14} /> Камера
+                    <Button size="sm" className="rounded-xl gap-1.5 blue-gradient text-white border-0 shadow-sm">
+                      <Icon name="Upload" size={14} /> Загрузить фото
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="glass border-neon-cyan/30">
+                  <DialogContent className="rounded-2xl">
                     <DialogHeader>
-                      <DialogTitle className="font-display text-neon-cyan">Добавить камеру</DialogTitle>
+                      <DialogTitle className="text-lg font-bold">Загрузить фото сотрудника</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3 py-2">
-                      <div className="space-y-1">
-                        <Label className="font-mono text-xs">Название</Label>
-                        <Input value={camName} onChange={(e) => setCamName(e.target.value)} placeholder="Cam-01 / Вход" />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="font-mono text-xs">RTSP URL</Label>
-                        <Input value={camUrl} onChange={(e) => setCamUrl(e.target.value)} placeholder="rtsp://..." className="font-mono" />
-                      </div>
+                      <Label className="text-sm font-medium">Изображение лица</Label>
+                      <Input
+                        type="file" accept="image/*"
+                        className="rounded-xl"
+                        onChange={e => setFaceFile(e.target.files?.[0] || null)}
+                      />
                     </div>
                     <DialogFooter>
-                      <Button onClick={handleAddCamera} disabled={loadingCam} className="bg-neon-cyan text-background hover:bg-neon-cyan/80">
-                        {loadingCam ? <Icon name="LoaderCircle" size={16} className="animate-spin" /> : 'Добавить'}
+                      <Button onClick={handleUploadFace} disabled={loadingFace} className="rounded-xl blue-gradient text-white border-0">
+                        {loadingFace ? <Icon name="LoaderCircle" size={16} className="animate-spin" /> : 'Загрузить'}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+              }
+            />
+            {faces.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <div className="w-14 h-14 blue-gradient-soft rounded-2xl flex items-center justify-center mb-3">
+                  <Icon name="Users" size={28} className="text-brand" />
+                </div>
+                <p className="text-sm font-medium text-foreground">Сотрудники не загружены</p>
+                <p className="text-xs text-muted-foreground mt-1">Добавьте фото через кнопку выше</p>
               </div>
-            }
-          >
-            {cameras.length === 0 ? (
-              <p className="py-6 text-center font-mono text-xs text-muted-foreground">Камеры не подключены</p>
             ) : (
               <ul className="space-y-2">
-                {cameras.map((c, i) => (
-                  <li key={c.id ?? i} className="flex items-center gap-3 rounded border border-border bg-secondary/40 px-3 py-2 animate-fade-up">
-                    <span className="h-2 w-2 rounded-full bg-neon-lime live-dot" />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-display text-sm text-foreground">{c.name}</div>
-                      <div className="truncate font-mono text-[11px] text-muted-foreground">{c.rtsp_url}</div>
+                {faces.map((f, i) => (
+                  <li key={i} className="flex items-center gap-3 bg-secondary rounded-xl px-4 py-3 animate-fade-up" style={{ animationDelay: `${i * 50}ms` }}>
+                    <div className="w-8 h-8 blue-gradient rounded-full flex items-center justify-center flex-shrink-0">
+                      <Icon name="User" size={15} className="text-white" />
                     </div>
-                    <Icon name="Cctv" size={16} className="text-neon-cyan" />
+                    <span className="text-sm font-medium flex-1 truncate">{f}</span>
+                    <Icon name="CheckCircle" size={16} className="text-success flex-shrink-0" />
                   </li>
                 ))}
               </ul>
             )}
-          </Panel>
+          </Card>
+
+          {/* Камеры */}
+          <Card>
+            <SectionHead
+              icon="Cctv"
+              title="Камеры и видео"
+              action={
+                <div className="flex gap-2">
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary transition-colors">
+                    {loadingVideo
+                      ? <Icon name="LoaderCircle" size={13} className="animate-spin" />
+                      : <Icon name="Film" size={13} />}
+                    Видео
+                    <input type="file" accept="video/*" className="hidden" onChange={handleUploadVideo} />
+                  </label>
+                  <Dialog open={camOpen} onOpenChange={setCamOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="rounded-xl gap-1.5 blue-gradient text-white border-0 shadow-sm">
+                        <Icon name="Plus" size={14} /> Камера
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="rounded-2xl">
+                      <DialogHeader>
+                        <DialogTitle className="text-lg font-bold">Добавить камеру</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-3 py-2">
+                        <div className="space-y-1.5">
+                          <Label className="text-sm font-medium">Название</Label>
+                          <Input value={camName} onChange={e => setCamName(e.target.value)} placeholder="Cam-01 / Вход" className="rounded-xl" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-sm font-medium">RTSP URL</Label>
+                          <Input value={camUrl} onChange={e => setCamUrl(e.target.value)} placeholder="rtsp://..." className="rounded-xl font-mono text-sm" />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button onClick={handleAddCamera} disabled={loadingCam} className="rounded-xl blue-gradient text-white border-0">
+                          {loadingCam ? <Icon name="LoaderCircle" size={16} className="animate-spin" /> : 'Добавить'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              }
+            />
+            {cameras.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <div className="w-14 h-14 blue-gradient-soft rounded-2xl flex items-center justify-center mb-3">
+                  <Icon name="Cctv" size={28} className="text-brand" />
+                </div>
+                <p className="text-sm font-medium text-foreground">Камеры не подключены</p>
+                <p className="text-xs text-muted-foreground mt-1">Добавьте камеру через кнопку выше</p>
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {cameras.map((c, i) => (
+                  <li key={c.id ?? i} className="flex items-center gap-3 bg-secondary rounded-xl px-4 py-3 animate-fade-up" style={{ animationDelay: `${i * 50}ms` }}>
+                    <div className="w-2 h-2 rounded-full bg-success live-ring flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{c.name}</p>
+                      <p className="text-xs text-muted-foreground font-mono truncate">{c.rtsp_url}</p>
+                    </div>
+                    <Icon name="Cctv" size={16} className="text-brand flex-shrink-0" />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
         </div>
 
-        <Panel
-          title="События · Логи"
-          icon="ScrollText"
-          action={
-            <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-neon-lime">
-              <span className="h-1.5 w-1.5 rounded-full bg-neon-lime live-dot" /> live · 5s
-            </span>
-          }
-        >
+        {/* ── EVENTS ── */}
+        <Card>
+          <SectionHead
+            icon="ScrollText"
+            title="События и логи"
+            action={
+              <div className="flex items-center gap-2 bg-green-50 rounded-full px-3 py-1.5">
+                <span className="w-2 h-2 rounded-full bg-success live-ring" />
+                <span className="text-xs font-medium text-green-700">Авто-обновление · 5 сек</span>
+              </div>
+            }
+          />
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full">
               <thead>
-                <tr className="border-b border-border text-left font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-                  <th className="pb-2 pr-4">Сотрудник</th>
-                  <th className="pb-2 pr-4">Тип</th>
-                  <th className="pb-2 pr-4">Детали</th>
-                  <th className="pb-2">Время</th>
+                <tr className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="text-left pb-3 pr-4">Сотрудник</th>
+                  <th className="text-left pb-3 pr-4">Тип события</th>
+                  <th className="text-left pb-3 pr-4">Детали</th>
+                  <th className="text-left pb-3">Время</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border">
                 {events.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center font-mono text-xs text-muted-foreground">
-                      Событий пока нет
+                    <td colSpan={4}>
+                      <div className="flex flex-col items-center justify-center py-10 text-center">
+                        <div className="w-14 h-14 blue-gradient-soft rounded-2xl flex items-center justify-center mb-3">
+                          <Icon name="ClipboardList" size={28} className="text-brand" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">Событий пока нет</p>
+                        <p className="text-xs text-muted-foreground mt-1">Данные обновляются каждые 5 секунд</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
-                  events
-                    .slice()
-                    .reverse()
-                    .map((ev, i) => {
-                      const st = eventStyle(ev.event_type);
-                      return (
-                        <tr key={ev.id ?? i} className="border-b border-border/40 hover:bg-secondary/30">
-                          <td className="py-2.5 pr-4 font-medium">{ev.name || '—'}</td>
-                          <td className="py-2.5 pr-4">
-                            <span className={`inline-flex items-center gap-1.5 font-mono text-xs ${st.color}`}>
-                              <Icon name={st.icon} size={13} /> {st.label}
-                            </span>
-                          </td>
-                          <td className="py-2.5 pr-4 text-muted-foreground">{ev.details || '—'}</td>
-                          <td className="py-2.5 font-mono text-xs text-muted-foreground">
-                            {ev.time || ev.timestamp || '—'}
-                          </td>
-                        </tr>
-                      );
-                    })
+                  events.slice().reverse().map((ev, i) => {
+                    const m = eventMeta(ev.event_type);
+                    return (
+                      <tr key={ev.id ?? i} className="hover:bg-secondary/50 transition-colors">
+                        <td className="py-3 pr-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 blue-gradient-soft rounded-lg flex items-center justify-center flex-shrink-0">
+                              <Icon name="User" size={13} className="text-brand" />
+                            </div>
+                            <span className="text-sm font-semibold">{ev.name || '—'}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${m.bg} ${m.color}`}>
+                            <Icon name={m.icon} size={12} /> {m.label}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4 text-sm text-muted-foreground">{ev.details || '—'}</td>
+                        <td className="py-3 text-xs text-muted-foreground font-mono">{ev.time || ev.timestamp || '—'}</td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
-        </Panel>
+        </Card>
       </main>
 
-      <footer className="container py-6 text-center font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground/50">
-        Neurovision · video analytics control system
+      <footer className="container pb-8 text-center text-xs text-muted-foreground">
+        Система видеоаналитики · 72.56.35.26:8000
       </footer>
     </div>
   );
