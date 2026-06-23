@@ -1,10 +1,12 @@
 """
 Прокси-функция: перенаправляет все запросы от фронтенда к FastAPI-серверу на 72.56.35.26:8000.
 Решает проблему Mixed Content (HTTPS сайт → HTTP сервер).
+Поддерживает JSON, form-data и бинарные (base64) тела.
 """
 
 import json
 import os
+import base64
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -23,24 +25,40 @@ def handler(event: dict, context) -> dict:
         return {"statusCode": 200, "headers": CORS, "body": ""}
 
     method = event.get("httpMethod", "GET")
-    path = event.get("queryStringParameters", {}).get("path", "/")
-    body_raw = event.get("body") or ""
+    path = (event.get("queryStringParameters") or {}).get("path", "/")
 
     url = TARGET.rstrip("/") + "/" + path.lstrip("/")
 
-    # Передаём query string если есть (кроме нашего ?path=)
     qs = {k: v for k, v in (event.get("queryStringParameters") or {}).items() if k != "path"}
     if qs:
         url += "?" + urllib.parse.urlencode(qs)
 
+    # Заголовки — передаём Content-Type как есть
     req_headers = {}
-    content_type = (event.get("headers") or {}).get("content-type", "")
+    incoming_headers = event.get("headers") or {}
+    content_type = (
+        incoming_headers.get("content-type")
+        or incoming_headers.get("Content-Type")
+        or ""
+    )
     if content_type:
         req_headers["Content-Type"] = content_type
 
-    body_bytes = body_raw.encode() if isinstance(body_raw, str) else body_raw
+    # Тело: base64 или строка
+    body_raw = event.get("body") or ""
+    if event.get("isBase64Encoded") and body_raw:
+        body_bytes = base64.b64decode(body_raw)
+    elif isinstance(body_raw, str):
+        body_bytes = body_raw.encode("utf-8")
+    else:
+        body_bytes = body_raw
 
-    req = urllib.request.Request(url, data=body_bytes or None, headers=req_headers, method=method)
+    req = urllib.request.Request(
+        url,
+        data=body_bytes if body_bytes else None,
+        headers=req_headers,
+        method=method,
+    )
 
     try:
         with urllib.request.urlopen(req, timeout=25) as resp:
