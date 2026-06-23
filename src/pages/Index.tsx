@@ -50,7 +50,7 @@ const SectionHead = ({ icon, title, action }: { icon: string; title: string; act
 export default function Index() {
   const [cameras, setCameras]   = useState<Camera[]>([]);
   const [events, setEvents]     = useState<AppEvent[]>([]);
-  const [faces, setFaces]       = useState<string[]>([]);
+  const [faces, setFaces]       = useState<{ name: string; position: string; filename: string }[]>([]);
   const [online, setOnline]     = useState<boolean | null>(null);
   const [checkingPing, setCheckingPing] = useState(false);
 
@@ -59,6 +59,8 @@ export default function Index() {
   const [camOpen, setCamOpen]   = useState(false);
   const [faceOpen, setFaceOpen] = useState(false);
   const [faceFile, setFaceFile] = useState<File | null>(null);
+  const [faceName, setFaceName] = useState('');
+  const [facePosition, setFacePosition] = useState('');
 
   const [loadingCam, setLoadingCam]   = useState(false);
   const [loadingFace, setLoadingFace] = useState(false);
@@ -75,7 +77,10 @@ export default function Index() {
   }, []);
 
   const loadFaces = useCallback(async () => {
-    try { const d = await facesApi.list(); if (d.length) setFaces(d); } catch { /* silent */ }
+    try {
+      const d = await facesApi.list();
+      if (d.length) setFaces(d.map(f => ({ name: f, position: '', filename: f })));
+    } catch { /* silent */ }
   }, []);
 
   useEffect(() => {
@@ -108,12 +113,14 @@ export default function Index() {
   };
 
   const handleUploadFace = async () => {
-    if (!faceFile) return toast.error('Выберите файл');
+    if (!faceName.trim()) return toast.error('Введите ФИО сотрудника');
+    if (!faceFile) return toast.error('Выберите фото');
     setLoadingFace(true);
     try {
       await facesApi.upload(faceFile);
-      toast.success('Фото загружено');
-      setFaces(p => [faceFile.name, ...p]); setFaceFile(null); setFaceOpen(false);
+      toast.success('Сотрудник добавлен');
+      setFaces(p => [{ name: faceName.trim(), position: facePosition.trim(), filename: faceFile.name }, ...p]);
+      setFaceFile(null); setFaceName(''); setFacePosition(''); setFaceOpen(false);
     } catch { toast.error('Ошибка загрузки'); }
     finally { setLoadingFace(false); }
   };
@@ -202,27 +209,48 @@ export default function Index() {
               icon="UserRound"
               title="Сотрудники"
               action={
-                <Dialog open={faceOpen} onOpenChange={setFaceOpen}>
+                <Dialog open={faceOpen} onOpenChange={open => { setFaceOpen(open); if (!open) { setFaceName(''); setFacePosition(''); setFaceFile(null); } }}>
                   <DialogTrigger asChild>
                     <Button size="sm" className="rounded-xl gap-1.5 blue-gradient text-white border-0 shadow-sm">
-                      <Icon name="Upload" size={14} /> Загрузить фото
+                      <Icon name="UserPlus" size={14} /> Добавить сотрудника
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="rounded-2xl">
                     <DialogHeader>
-                      <DialogTitle className="text-lg font-bold">Загрузить фото сотрудника</DialogTitle>
+                      <DialogTitle className="text-lg font-bold">Новый сотрудник</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-3 py-2">
-                      <Label className="text-sm font-medium">Изображение лица</Label>
-                      <Input
-                        type="file" accept="image/*"
-                        className="rounded-xl"
-                        onChange={e => setFaceFile(e.target.files?.[0] || null)}
-                      />
+                    <div className="space-y-4 py-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">ФИО <span className="text-destructive">*</span></Label>
+                        <Input
+                          value={faceName}
+                          onChange={e => setFaceName(e.target.value)}
+                          placeholder="Иванов Иван Иванович"
+                          className="rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">Должность</Label>
+                        <Input
+                          value={facePosition}
+                          onChange={e => setFacePosition(e.target.value)}
+                          placeholder="Менеджер, охранник…"
+                          className="rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">Фото лица <span className="text-destructive">*</span></Label>
+                        <Input
+                          type="file" accept="image/*"
+                          className="rounded-xl"
+                          onChange={e => setFaceFile(e.target.files?.[0] || null)}
+                        />
+                        <p className="text-xs text-muted-foreground">Фото используется для распознавания в системе</p>
+                      </div>
                     </div>
                     <DialogFooter>
-                      <Button onClick={handleUploadFace} disabled={loadingFace} className="rounded-xl blue-gradient text-white border-0">
-                        {loadingFace ? <Icon name="LoaderCircle" size={16} className="animate-spin" /> : 'Загрузить'}
+                      <Button onClick={handleUploadFace} disabled={loadingFace} className="rounded-xl blue-gradient text-white border-0 w-full">
+                        {loadingFace ? <Icon name="LoaderCircle" size={16} className="animate-spin" /> : 'Добавить сотрудника'}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -235,16 +263,19 @@ export default function Index() {
                   <Icon name="Users" size={28} className="text-brand" />
                 </div>
                 <p className="text-sm font-medium text-foreground">Сотрудники не загружены</p>
-                <p className="text-xs text-muted-foreground mt-1">Добавьте фото через кнопку выше</p>
+                <p className="text-xs text-muted-foreground mt-1">Нажмите «Добавить сотрудника» выше</p>
               </div>
             ) : (
               <ul className="space-y-2">
                 {faces.map((f, i) => (
                   <li key={i} className="flex items-center gap-3 bg-secondary rounded-xl px-4 py-3 animate-fade-up" style={{ animationDelay: `${i * 50}ms` }}>
-                    <div className="w-8 h-8 blue-gradient rounded-full flex items-center justify-center flex-shrink-0">
-                      <Icon name="User" size={15} className="text-white" />
+                    <div className="w-9 h-9 blue-gradient rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold text-sm">
+                      {f.name ? f.name.charAt(0).toUpperCase() : <Icon name="User" size={15} className="text-white" />}
                     </div>
-                    <span className="text-sm font-medium flex-1 truncate">{f}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{f.name || f.filename}</p>
+                      {f.position && <p className="text-xs text-muted-foreground truncate">{f.position}</p>}
+                    </div>
                     <Icon name="CheckCircle" size={16} className="text-success flex-shrink-0" />
                   </li>
                 ))}
